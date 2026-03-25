@@ -1,171 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnimeToon Finder</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { background: #1e293b; padding: 2rem; border-radius: 1.5rem; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h2 { color: #38bdf8; margin-bottom: 1.5rem; }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; margin-bottom: 1rem; box-sizing: border-box; outline: none; }
-        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        #status { margin-top: 1rem; font-size: 0.9rem; color: #94a3b8; }
-        iframe { margin-top: 1.5rem; width: 100%; height: 250px; border-radius: 12px; display: none; background: black; border: 1px solid #38bdf8; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnimeToon Finder</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+.container {
+    background: #1e293b;
+    padding: 2rem;
+    border-radius: 1.5rem;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 1px solid #334155;
+}
+h2 { color: #38bdf8; margin-bottom: 1.5rem; }
+
+input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #0f172a;
+    color: white;
+    margin-bottom: 1rem;
+    outline: none;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover { background: #1d4ed8; }
+
+#status {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+</style>
 </head>
+
 <body>
 
-    <div class="container">
-        <h2>AnimeToon Finder</h2>
-        <input type="text" id="animeInput" placeholder="Anime name (e.g. Naruto)">
-        <button id="searchBtn">Find Hindi Dub</button>
-        <div id="status">Ready...</div>
-        <iframe id="videoPlayer" src="" allowfullscreen></iframe>
-    </div>
+<div class="container">
+    <h2>AnimeToon Finder</h2>
+    <input type="text" id="animeInput" placeholder="Enter Anime Name (e.g. Naruto)">
+    <button id="searchBtn">Find Hindi Dub</button>
+    <div id="status">Ready to search...</div>
+</div>
 
-    <script>
-        const searchBtn = document.getElementById('searchBtn');
-        const status = document.getElementById('status');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const animeInput = document.getElementById('animeInput');
+<script>
+const searchBtn = document.getElementById('searchBtn');
+const status = document.getElementById('status');
+const animeInput = document.getElementById('animeInput');
 
-        // তোমার ক্লাউডফ্লেয়ার প্রক্সি (নিশ্চিত করো শেষে /?url= আছে)
-        const MY_PROXY = "https://icy-union-41ef.mdiasen0182.workers.dev/?url="; 
-        
-        // ToonStream ডোমেইন (কাজ না করলে এখানে .dad পরিবর্তন করে .org বা .net ট্রাই করা যায়)
-        const BASE_URL = "https://toonstream.dad"; 
+// 🔥 YOUR PROXY
+const MY_PROXY = "https://icy-union-41ef.mdiasen0182.workers.dev/?url=";
 
-        async function fetchWithProxy(targetUrl) {
-            const response = await fetch(MY_PROXY + encodeURIComponent(targetUrl));
-            if (!response.ok) throw new Error("Proxy error");
-            return await response.text();
+// fetch function
+async function fetchHtml(url) {
+    const res = await fetch(MY_PROXY + encodeURIComponent(url));
+    if (!res.ok) throw new Error("Proxy error");
+    return await res.text();
+}
+
+// 🔍 extract trid safely
+function extractTrid(html) {
+    let match =
+        html.match(/trid=(\d+)/) ||
+        html.match(/trid["']?\s*[:=]\s*["']?(\d+)/) ||
+        html.match(/data-trid=["'](\d+)/);
+
+    return match ? match[1] : null;
+}
+
+searchBtn.addEventListener('click', async () => {
+
+    const query = animeInput.value.trim();
+    if (!query) return;
+
+    status.innerHTML = "🔍 Searching...";
+    searchBtn.disabled = true;
+
+    try {
+
+        // 🔍 search page
+        const searchUrl = `https://toonstream.dad/home/?s=${encodeURIComponent(query)}`;
+        const searchHtml = await fetchHtml(searchUrl);
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(searchHtml, "text/html");
+
+        const firstResult =
+            doc.querySelector(".result-item a") ||
+            doc.querySelector("article a") ||
+            doc.querySelector(".post-title a");
+
+        if (!firstResult) {
+            status.innerHTML = "❌ No results found";
+            searchBtn.disabled = false;
+            return;
         }
 
-        searchBtn.addEventListener('click', async () => {
-            const query = animeInput.value.trim();
-            if (!query) return;
+        const animePage = firstResult.href;
 
-            status.innerHTML = "🔍 Searching ToonStream...";
-            videoPlayer.style.display = "none";
+        status.innerHTML = "📄 Loading anime page...";
 
-            try {
-                // ১. সার্চ রেজাল্ট পেজ আনা
-                const searchHtml = await fetchWithProxy(`${BASE_URL}/home/?s=${encodeURIComponent(query)}`);
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(searchHtml, "text/html");
-                
-                // প্রথম এনিমে লিঙ্কটি খোঁজা
-                const firstResult = doc.querySelector(".result-item a, article a, .post-title a");
+        // 📄 open page
+        const pageHtml = await fetchHtml(animePage);
 
-                if (!firstResult) {
-                    status.innerHTML = "❌ No results found. Try another spelling.";
-                    return;
-                }
+        const trid = extractTrid(pageHtml);
 
-                let animeLink = firstResult.href;
-                // ডোমেইন ঠিক করা যদি লিঙ্কটি রিলেটিভ হয়
-                if (animeLink.startsWith('/')) animeLink = BASE_URL + animeLink;
-
-                status.innerHTML = "📄 Loading Anime Page...";
-
-                // ২. এনিমে পেজ থেকে ভিডিও আইডি (trid) বের করা
-                const pageHtml = await fetchWithProxy(animeLink);
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnimeToon Finder</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .container { background: #1e293b; padding: 2rem; border-radius: 1.5rem; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }
-        h2 { color: #38bdf8; margin-bottom: 1.5rem; }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; margin-bottom: 1rem; box-sizing: border-box; outline: none; }
-        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #1d4ed8; }
-        #status { margin-top: 1rem; font-size: 0.9rem; color: #94a3b8; min-height: 20px; }
-        iframe { margin-top: 1.5rem; width: 100%; height: 250px; border-radius: 12px; display: none; background: black; border: 1px solid #38bdf8; }
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <h2>AnimeToon Finder</h2>
-        <input type="text" id="animeInput" placeholder="Enter Anime Name (e.g. Naruto)">
-        <button id="searchBtn">Find Hindi Dub</button>
-        <div id="status">Ready to search...</div>
-        <iframe id="videoPlayer" src="" allowfullscreen scrolling="no"></iframe>
-    </div>
-
-    <script>
-        const searchBtn = document.getElementById('searchBtn');
-        const status = document.getElementById('status');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const animeInput = document.getElementById('animeInput');
-
-        // আপনার লাইভ ক্লাউডফ্লেয়ার প্রক্সি লিঙ্ক (সঠিক ফরম্যাট)
-        const MY_PROXY = "https://icy-union-41ef.mdiasen0182.workers.dev/?url="; 
-
-        async function fetchHtml(url) {
-            try {
-                // লিঙ্কটি প্রক্সির মাধ্যমে পাঠানো হচ্ছে
-                const response = await fetch(MY_PROXY + encodeURIComponent(url));
-                if (!response.ok) throw new Error("Connection failed");
-                return await response.text();
-            } catch (err) {
-                console.error(err);
-                throw new Error("Proxy connection error.");
-            }
+        if (!trid) {
+            status.innerHTML = "⚠️ Could not find video ID";
+            searchBtn.disabled = false;
+            return;
         }
 
-        searchBtn.addEventListener('click', async () => {
-            const query = animeInput.value.trim();
-            if (!query) return;
+        // 🎬 final link
+        const finalUrl = `https://toonstream.dad/home/?trembed=0&trid=${trid}&trtype=2`;
 
-            status.innerHTML = "🔍 Searching ToonStream...";
-            videoPlayer.style.display = "none";
+        status.innerHTML = "✅ Opening video...";
 
-            try {
-                // ToonStream সাইটে সার্চ করা
-                const searchUrl = `https://toonstream.dad/home/?s=${encodeURIComponent(query)}`;
-                const searchHtml = await fetchHtml(searchUrl);
-                
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(searchHtml, "text/html");
-                const firstResult = doc.querySelector(".result-item a, article a, .post-title a");
+        // ❗ iframe bad, direct open
+        window.open(finalUrl, "_blank");
 
-                if (!firstResult) {
-                    status.innerHTML = "❌ No results found.";
-                    return;
-                }
+    } catch (err) {
+        console.error(err);
+        status.innerHTML = "❌ Failed to fetch data";
+    }
 
-                const animePageLink = firstResult.href;
-                status.innerHTML = "📄 Loading Video...";
+    searchBtn.disabled = false;
+});
 
-                // এনিমে পেজ থেকে ভিডিওর আইডি খুঁজে বের করা
-                const pageHtml = await fetchHtml(animePageLink);
-                const tridMatch = pageHtml.match(/trid\s*[:=]\s*["']?(\d+)["']?/);
+// enter key support
+animeInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") searchBtn.click();
+});
+</script>
 
-                if (tridMatch && tridMatch[1]) {
-                    const trid = tridMatch[1];
-                    // হিন্দি ডাব প্লেয়ারের লিঙ্ক জেনারেট করা
-                    const finalEmbed = `https://toonstream.dad/home/?trembed=0&trid=${trid}&trtype=2`;
-                    
-                    status.innerHTML = "✅ Found! Playing now...";
-                    videoPlayer.src = finalEmbed;
-                    videoPlayer.style.display = "block";
-                } else {
-                    status.innerHTML = "⚠️ Video not found on this page.";
-                }
-
-            } catch (err) {
-                status.innerHTML = "❌ Error connecting to server.";
-            }
-        });
-
-        // Enter key সাপোর্ট
-        animeInput.addEventListener("keypress", (e) => { if (e.key === "Enter") searchBtn.click(); });
-    </script>
 </body>
 </html>
