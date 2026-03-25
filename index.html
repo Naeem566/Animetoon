@@ -14,7 +14,6 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    margin: 0;
 }
 .container {
     background: #1e293b;
@@ -23,40 +22,15 @@ body {
     width: 90%;
     max-width: 400px;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    border: 1px solid #334155;
 }
-h2 { color: #38bdf8; margin-bottom: 1.5rem; }
-
-input {
+input, button {
     width: 100%;
     padding: 12px;
     border-radius: 8px;
-    border: 1px solid #334155;
-    background: #0f172a;
-    color: white;
-    margin-bottom: 1rem;
-    outline: none;
+    margin-bottom: 10px;
 }
-
-button {
-    width: 100%;
-    padding: 12px;
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-button:hover { background: #1d4ed8; }
-
-#status {
-    margin-top: 1rem;
-    font-size: 0.9rem;
-    color: #94a3b8;
-}
+button { background: #2563eb; color: white; border: none; }
+#status { margin-top: 10px; color: #94a3b8; }
 </style>
 </head>
 
@@ -64,9 +38,9 @@ button:hover { background: #1d4ed8; }
 
 <div class="container">
     <h2>AnimeToon Finder</h2>
-    <input type="text" id="animeInput" placeholder="Enter Anime Name (e.g. Naruto)">
+    <input type="text" id="animeInput" placeholder="Enter Anime Name">
     <button id="searchBtn">Find Hindi Dub</button>
-    <div id="status">Ready to search...</div>
+    <div id="status">Ready...</div>
 </div>
 
 <script>
@@ -74,17 +48,17 @@ const searchBtn = document.getElementById('searchBtn');
 const status = document.getElementById('status');
 const animeInput = document.getElementById('animeInput');
 
-// 🔥 YOUR PROXY
-const MY_PROXY = "https://icy-union-41ef.mdiasen0182.workers.dev/?url=";
+// 🔥 CHANGE THIS
+const WORKER_URL = "https://your-worker.workers.dev";
+const API_KEY = "yasin123";
 
-// fetch function
 async function fetchHtml(url) {
-    const res = await fetch(MY_PROXY + encodeURIComponent(url));
+    const proxyUrl = WORKER_URL + "/?url=" + encodeURIComponent(url) + "&key=" + API_KEY;
+    const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error("Proxy error");
     return await res.text();
 }
 
-// 🔍 extract trid safely
 function extractTrid(html) {
     let match =
         html.match(/trid=(\d+)/) ||
@@ -103,13 +77,9 @@ searchBtn.addEventListener('click', async () => {
     searchBtn.disabled = true;
 
     try {
+        const searchHtml = await fetchHtml(`https://toonstream.dad/home/?s=${query}`);
 
-        // 🔍 search page
-        const searchUrl = `https://toonstream.dad/home/?s=${encodeURIComponent(query)}`;
-        const searchHtml = await fetchHtml(searchUrl);
-
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(searchHtml, "text/html");
+        const doc = new DOMParser().parseFromString(searchHtml, "text/html");
 
         const firstResult =
             doc.querySelector(".result-item a") ||
@@ -117,43 +87,35 @@ searchBtn.addEventListener('click', async () => {
             doc.querySelector(".post-title a");
 
         if (!firstResult) {
-            status.innerHTML = "❌ No results found";
+            status.innerHTML = "❌ Not found";
             searchBtn.disabled = false;
             return;
         }
 
-        const animePage = firstResult.href;
+        status.innerHTML = "📄 Loading...";
 
-        status.innerHTML = "📄 Loading anime page...";
-
-        // 📄 open page
-        const pageHtml = await fetchHtml(animePage);
-
+        const pageHtml = await fetchHtml(firstResult.href);
         const trid = extractTrid(pageHtml);
 
         if (!trid) {
-            status.innerHTML = "⚠️ Could not find video ID";
+            status.innerHTML = "⚠️ Video not found";
             searchBtn.disabled = false;
             return;
         }
 
-        // 🎬 final link
         const finalUrl = `https://toonstream.dad/home/?trembed=0&trid=${trid}&trtype=2`;
 
         status.innerHTML = "✅ Opening video...";
-
-        // ❗ iframe bad, direct open
         window.open(finalUrl, "_blank");
 
-    } catch (err) {
-        console.error(err);
-        status.innerHTML = "❌ Failed to fetch data";
+    } catch (e) {
+        console.error(e);
+        status.innerHTML = "❌ Error";
     }
 
     searchBtn.disabled = false;
 });
 
-// enter key support
 animeInput.addEventListener("keypress", (e) => {
     if (e.key === "Enter") searchBtn.click();
 });
