@@ -1,124 +1,64 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AnimeToon Finder</title>
-
-<style>
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background: #0f172a;
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-}
-.container {
-    background: #1e293b;
-    padding: 2rem;
-    border-radius: 1.5rem;
-    width: 90%;
-    max-width: 400px;
-    text-align: center;
-}
-input, button {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-}
-button { background: #2563eb; color: white; border: none; }
-#status { margin-top: 10px; color: #94a3b8; }
-</style>
+<title>TRID Finder</title>
 </head>
 
-<body>
+<body style="background:#0f172a;color:white;text-align:center;padding-top:50px">
 
-<div class="container">
-    <h2>AnimeToon Finder</h2>
-    <input type="text" id="animeInput" placeholder="Enter Anime Name">
-    <button id="searchBtn">Find Hindi Dub</button>
-    <div id="status">Ready...</div>
-</div>
+<h2>Find ToonStream TRID</h2>
+
+<input id="name" placeholder="naruto" style="padding:10px">
+<button onclick="find()">Search</button>
+
+<p id="out"></p>
 
 <script>
-const searchBtn = document.getElementById('searchBtn');
-const status = document.getElementById('status');
-const animeInput = document.getElementById('animeInput');
 
-// 🔥 CHANGE THIS
-const WORKER_URL = "https://your-worker.workers.dev";
-const API_KEY = "yasin123";
+const WORKER = "https://icy-union-41ef.mdiasen0182.workers.dev";
 
-async function fetchHtml(url) {
-    const proxyUrl = WORKER_URL + "/?url=" + encodeURIComponent(url) + "&key=" + API_KEY;
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error("Proxy error");
-    return await res.text();
-}
+async function find() {
 
-function extractTrid(html) {
-    let match =
-        html.match(/trid=(\d+)/) ||
-        html.match(/trid["']?\s*[:=]\s*["']?(\d+)/) ||
-        html.match(/data-trid=["'](\d+)/);
+  const q = document.getElementById("name").value;
+  const out = document.getElementById("out");
 
-    return match ? match[1] : null;
-}
+  if (!q) return;
 
-searchBtn.addEventListener('click', async () => {
+  out.innerText = "Searching...";
 
-    const query = animeInput.value.trim();
-    if (!query) return;
+  try {
 
-    status.innerHTML = "🔍 Searching...";
-    searchBtn.disabled = true;
+    // 🔍 search page
+    const res = await fetch(WORKER + "/?url=" + encodeURIComponent("https://toonstream.dad/home/?s=" + q));
+    const html = await res.text();
 
-    try {
-        const searchHtml = await fetchHtml(`https://toonstream.dad/home/?s=${query}`);
+    const doc = new DOMParser().parseFromString(html, "text/html");
 
-        const doc = new DOMParser().parseFromString(searchHtml, "text/html");
+    const link = doc.querySelector(".result-item a")?.href;
 
-        const firstResult =
-            doc.querySelector(".result-item a") ||
-            doc.querySelector("article a") ||
-            doc.querySelector(".post-title a");
-
-        if (!firstResult) {
-            status.innerHTML = "❌ Not found";
-            searchBtn.disabled = false;
-            return;
-        }
-
-        status.innerHTML = "📄 Loading...";
-
-        const pageHtml = await fetchHtml(firstResult.href);
-        const trid = extractTrid(pageHtml);
-
-        if (!trid) {
-            status.innerHTML = "⚠️ Video not found";
-            searchBtn.disabled = false;
-            return;
-        }
-
-        const finalUrl = `https://toonstream.dad/home/?trembed=0&trid=${trid}&trtype=2`;
-
-        status.innerHTML = "✅ Opening video...";
-        window.open(finalUrl, "_blank");
-
-    } catch (e) {
-        console.error(e);
-        status.innerHTML = "❌ Error";
+    if (!link) {
+      out.innerText = "Not found";
+      return;
     }
 
-    searchBtn.disabled = false;
-});
+    // 📄 anime page
+    const res2 = await fetch(WORKER + "/?url=" + encodeURIComponent(link));
+    const html2 = await res2.text();
 
-animeInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") searchBtn.click();
-});
+    const match = html2.match(/trid=(\d+)/);
+
+    if (match) {
+      out.innerText = "TRID = " + match[1];
+    } else {
+      out.innerText = "TRID not found";
+    }
+
+  } catch (e) {
+    out.innerText = "Error";
+  }
+}
+
 </script>
 
 </body>
