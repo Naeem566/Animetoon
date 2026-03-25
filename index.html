@@ -3,28 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ToonStream ID Finder | GitHub Edition</title>
+    <title>ToonStream Finder | GitHub Live</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b1120; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0b1120; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .box { background: #1e293b; padding: 30px; border-radius: 20px; width: 90%; max-width: 450px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         h2 { color: #38bdf8; margin-bottom: 20px; }
         input { width: 100%; padding: 14px; border-radius: 10px; border: 2px solid #334155; background: #0f172a; color: white; font-size: 16px; box-sizing: border-box; margin-bottom: 15px; outline: none; }
-        input:focus { border-color: #2563eb; }
-        button { width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #1d4ed8; }
-        #status { margin-top: 20px; padding: 15px; background: #0f172a; border-radius: 10px; font-size: 14px; color: #94a3b8; min-height: 40px; }
+        button { width: 100%; padding: 14px; background: #2563eb; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        #status { margin-top: 20px; padding: 15px; background: #0f172a; border-radius: 10px; font-size: 14px; color: #94a3b8; }
         .success { color: #4ade80; }
         .error { color: #f87171; }
-        iframe { margin-top: 20px; width: 100%; height: 250px; border: 1px solid #334155; border-radius: 12px; display: none; }
+        iframe { margin-top: 20px; width: 100%; height: 300px; border: 1px solid #334155; border-radius: 12px; display: none; }
     </style>
 </head>
 <body>
 
     <div class="box">
         <h2>ToonStream Finder</h2>
-        <input type="text" id="animeInput" placeholder="Anime Name (e.g. Tokyo Ghoul)">
+        <input type="text" id="animeInput" placeholder="Anime Name (e.g. Naruto)">
         <button id="searchBtn">Find Hindi Dub</button>
-        <div id="status">Ready to search...</div>
+        <div id="status">Ready...</div>
         <iframe id="videoPlayer" src="" allowfullscreen></iframe>
     </div>
 
@@ -34,65 +32,75 @@
         const videoPlayer = document.getElementById('videoPlayer');
         const animeInput = document.getElementById('animeInput');
 
-        // GitHub-এ কাজ করার জন্য সবচাইতে স্টেবল প্রক্সি লজিক
-        async function smartFetch(url) {
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-            try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) throw new Error("Proxy response not ok");
-                const data = await res.json();
-                return data.contents;
-            } catch (e) {
-                throw new Error("Proxy connection failed. Check your internet.");
+        // Multi-proxy function to avoid "Failed to Fetch"
+        async function fetchWithProxy(url) {
+            const proxies = [
+                `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://thingproxy.freeboard.io/fetch/${url}`
+            ];
+
+            for (let proxy of proxies) {
+                try {
+                    const response = await fetch(proxy);
+                    if (!response.ok) continue;
+                    
+                    if (proxy.includes('allorigins')) {
+                        const data = await response.json();
+                        return data.contents;
+                    } else {
+                        return await response.text();
+                    }
+                } catch (e) {
+                    console.log("Switching proxy...");
+                }
             }
+            throw new Error("All proxies failed. Check internet.");
         }
 
         searchBtn.addEventListener('click', async () => {
             const query = animeInput.value.trim();
-            if (!query) return alert("Please type an anime name.");
+            if (!query) return;
 
-            status.innerHTML = "🔍 Searching ToonStream...";
+            status.innerHTML = "🔍 Connecting to ToonStream...";
             videoPlayer.style.display = "none";
 
             try {
-                // ১. ToonStream-এ সার্চ করা
+                // 1. Search
                 const searchUrl = `https://toonstream.dad/home/?s=${encodeURIComponent(query)}`;
-                const searchHtml = await smartFetch(searchUrl);
+                const searchHtml = await fetchWithProxy(searchUrl);
                 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(searchHtml, "text/html");
                 const firstResult = doc.querySelector(".result-item a") || doc.querySelector("article a");
 
                 if (!firstResult) {
-                    status.innerHTML = "<span class='error'>❌ Anime not found on ToonStream.</span>";
+                    status.innerHTML = "<span class='error'>❌ Not found!</span>";
                     return;
                 }
 
-                const animePageUrl = firstResult.href;
-                status.innerHTML = "📄 Found anime. Extracting TRID...";
+                const animeLink = firstResult.href;
+                status.innerHTML = "📄 Found anime. Extracting ID...";
 
-                // ২. এনিমে পেজ থেকে TRID বের করা
-                const pageHtml = await smartFetch(animePageUrl);
-                const idMatch = pageHtml.match(/trid\s*:\s*["']?(\d+)["']?/);
+                // 2. Extract ID
+                const pageHtml = await fetchWithProxy(animeLink);
+                const tridMatch = pageHtml.match(/trid\s*:\s*["']?(\d+)["']?/);
 
-                if (idMatch && idMatch[1]) {
-                    const trid = idMatch[1];
-                    const finalEmbed = `https://toonstream.dad/home/?trembed=3&trid=${trid}&trtype=3`;
-                    status.innerHTML = `<span class='success'>✅ Found ID: ${trid}</span>`;
-                    videoPlayer.src = finalEmbed;
+                if (tridMatch && tridMatch[1]) {
+                    const trid = tridMatch[1];
+                    const finalUrl = `https://toonstream.dad/home/?trembed=3&trid=${trid}&trtype=3`;
+                    status.innerHTML = `<span class='success'>✅ ID: ${trid} Found!</span>`;
+                    videoPlayer.src = finalUrl;
                     videoPlayer.style.display = "block";
                 } else {
-                    // Fallback to search result if TRID is missing
-                    status.innerHTML = "⚠️ TRID not found. Opening search result...";
+                    status.innerHTML = "⚠️ TRID not found. Opening search results.";
                     videoPlayer.src = searchUrl;
                     videoPlayer.style.display = "block";
                 }
             } catch (err) {
-                status.innerHTML = `<span class='error'>❌ Error: ${err.message}</span>`;
+                status.innerHTML = `<span class='error'>❌ ${err.message}</span>`;
             }
         });
-
-        animeInput.addEventListener("keypress", (e) => { if (e.key === "Enter") searchBtn.click(); });
     </script>
 </body>
 </html>
